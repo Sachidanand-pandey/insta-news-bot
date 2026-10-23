@@ -4,8 +4,8 @@ name: Instagram News Automation
 on:
   workflow_dispatch:
   schedule:
-    - cron: '30 0 * * *'
-    - cron: '30 12 * * *'
+    - cron: '25 0 * * *'    # 5:55 AM IST
+    - cron: '25 12 * * *'   # 5:55 PM IST
 
 permissions:
   contents: read
