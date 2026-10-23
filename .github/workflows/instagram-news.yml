@@ -1,11 +1,10 @@
-
 name: Instagram News Automation
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: '25 0 * * *'    # 5:55 AM IST
-    - cron: '25 12 * * *'   # 5:55 PM IST
+    - cron: '22 0 * * *'    # about 5:52 AM IST
+    - cron: '22 12 * * *'   # about 5:52 PM IST
 
 permissions:
   contents: read
@@ -32,6 +31,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Restore posted-news state
+        uses: actions/cache/restore@v4
+        with:
+          path: state
+          key: posted-state-${{ github.run_id }}
+          restore-keys: posted-state-
+
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
@@ -47,6 +53,13 @@ jobs:
 
       - name: Run Instagram automation
         run: mvn -B exec:java -Dexec.args=auto
+
+      - name: Save posted-news state
+        if: success()
+        uses: actions/cache/save@v4
+        with:
+          path: state
+          key: posted-state-${{ github.run_id }}
 
       - name: Upload generated images
         if: always()
