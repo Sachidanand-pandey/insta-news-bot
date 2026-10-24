@@ -43,6 +43,17 @@ final class Http {
         return res.body();
     }
 
+    /** Downloads raw bytes (for photos). Returns null when the server answers non-2xx. */
+    static byte[] getBytes(String url, Duration timeout) throws IOException, InterruptedException {
+        HttpRequest req = HttpRequest.newBuilder(URI.create(url))
+                .timeout(timeout)
+                .header("User-Agent", "Mozilla/5.0 (compatible; InstaNewsBot/1.0)")
+                .header("Accept", "image/*,*/*;q=0.5")
+                .GET().build();
+        HttpResponse<byte[]> res = CLIENT.send(req, HttpResponse.BodyHandlers.ofByteArray());
+        return res.statusCode() / 100 == 2 ? res.body() : null;
+    }
+
     /** Like {@link #send} but retries with backoff. Only use for idempotent calls. */
     static String sendWithRetry(HttpRequest request, int attempts) throws IOException, InterruptedException {
         IOException last = null;

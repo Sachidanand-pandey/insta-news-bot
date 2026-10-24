@@ -30,6 +30,7 @@ public final class Main {
         boolean dryRun = Config.getBool("DRY_RUN", false);
         String brand = Config.get("BRAND_NAME", "Daily News");
         int storyCount = Config.getInt("STORY_COUNT", 4);
+        String handle = Config.get("IG_HANDLE", "sixam.sixpm.news").replaceFirst("^@", "");
 
         // 1. Fetch and select
         NewsFetcher fetcher = new NewsFetcher();
@@ -45,19 +46,28 @@ public final class Main {
         System.out.println("Selected " + stories.size() + " stories for the " + edition + " edition:");
         stories.forEach(s -> System.out.println(" - [" + s.source() + "] " + s.title()));
 
-        // 2. Render slides with Selenium
+        // 2a. Find a photo for each story (null = render that slide without a photo)
+        List<String> photos = new ArrayList<>();
+        for (NewsItem story : stories) {
+            String photo = Config.getBool("USE_PHOTOS", true) ? PhotoFetcher.photoFor(story) : null;
+            photos.add(photo);
+            System.out.println(" photo for [" + story.source() + "]: " + (photo == null ? "none found" : "ok"));
+        }
+        String coverPhoto = photos.stream().filter(p -> p != null).findFirst().orElse(null);
+
+        // 2b. Render slides with Selenium
         Path outDir = Path.of("output", LocalDate.now(zone) + "-" + edition);
         List<Path> slides = new ArrayList<>();
         try (CardRenderer renderer = new CardRenderer(outDir)) {
-            slides.add(renderer.render(CardTemplates.cover(brand, editionLabel, dateLabel, stories.size()), "slide-0-cover"));
+            slides.add(renderer.render(CardTemplates.cover(brand, handle, editionLabel, dateLabel, stories.size(), coverPhoto), "slide-0-cover"));
             for (int i = 0; i < stories.size(); i++) {
-                slides.add(renderer.render(CardTemplates.news(brand, i + 1, stories.size(), stories.get(i)),
+                slides.add(renderer.render(CardTemplates.news(brand, handle, i + 1, stories.size(), stories.get(i), photos.get(i)),
                         "slide-" + (i + 1)));
             }
-            slides.add(renderer.render(CardTemplates.outro(brand), "slide-9-outro"));
+            slides.add(renderer.render(CardTemplates.outro(brand, handle), "slide-9-outro"));
         }
 
-        String caption = buildCaption(editionLabel, dateLabel, stories);
+        String caption = buildCaption(editionLabel, dateLabel, stories, handle);
         System.out.println("\nCaption:\n" + caption + "\n");
 
         if (dryRun) {
@@ -84,16 +94,26 @@ public final class Main {
         store.addAndSave(stories);
     }
 
-    static String buildCaption(String editionLabel, String dateLabel, List<NewsItem> stories) {
+    static String buildCaption(String editionLabel, String dateLabel, List<NewsItem> stories, String handle) {
         String icon = editionLabel.startsWith("Morning") ? "🌅" : "🌆";
         StringBuilder sb = new StringBuilder();
         sb.append(icon).append(' ').append(editionLabel).append(" | ").append(dateLabel).append("\n\n");
+        boolean anyLink = false;
         for (int i = 0; i < stories.size(); i++) {
-            sb.append(i + 1).append(". ").append(stories.get(i).title()).append("\n\n");
+            NewsItem s = stories.get(i);
+            sb.append(i + 1).append(". ").append(s.title()).append('\n');
+            if (!s.link().isBlank()) {
+                sb.append("Read more: ").append(s.link()).append('\n');
+                anyLink = true;
+            }
+            sb.append('\n');
+        }
+        if (anyLink) {
+            sb.append("(Instagram doesn't make links in captions tappable. Copy the link into your browser.)\n\n");
         }
         List<String> sources = stories.stream().map(NewsItem::source).distinct().toList();
         sb.append("Sources: ").append(String.join(", ", sources)).append("\n\n");
-        sb.append("Follow for your daily news update 📲\n\n");
+        sb.append("Follow @").append(handle).append(" for your daily news update 📲\n\n");
         sb.append(Config.get("HASHTAGS", "#news #todaynews #breakingnews #india #dailynews #currentaffairs #headlines"));
         String caption = sb.toString();
         return caption.length() <= 2200 ? caption : caption.substring(0, 2190) + "…";

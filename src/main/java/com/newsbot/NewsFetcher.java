@@ -25,6 +25,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /** Pulls headlines from RSS 2.0 feeds and picks a balanced, fresh, not-yet-posted set. */
 final class NewsFetcher {
@@ -83,12 +85,14 @@ final class NewsFetcher {
             if (title.isBlank()) {
                 continue;
             }
-            String summary = clean(text(item, "description"));
+            String rawDescription = text(item, "description");
+            String summary = clean(rawDescription);
             if (summary.equalsIgnoreCase(title)) {
                 summary = "";
             }
             out.add(new NewsItem(title, shorten(summary, 210), feed.name(),
-                    parseDate(text(item, "pubDate")), text(item, "link")));
+                    parseDate(text(item, "pubDate")), text(item, "link"),
+                    findImage(item, rawDescription)));
         }
         return out;
     }
@@ -118,6 +122,44 @@ final class NewsFetcher {
         }
         picked.sort(Comparator.comparing(NewsItem::published).reversed());
         return picked;
+    }
+
+    private static final Pattern IMG_EXT = Pattern.compile("\\.(jpe?g|png|webp)(\\?.*)?$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern IMG_TAG = Pattern.compile("<img[^>]+src=[\"']([^\"']+)[\"']", Pattern.CASE_INSENSITIVE);
+
+    /**
+     * Looks for a photo inside an RSS item: media:content, media:thumbnail, enclosure,
+     * then the first <img> in the description / content:encoded. Returns "" when there is none.
+     */
+    static String findImage(Element item, String rawDescription) {
+        for (String tag : new String[] {"media:content", "media:thumbnail", "enclosure"}) {
+            NodeList nodes = item.getElementsByTagName(tag);
+            for (int i = 0; i < nodes.getLength(); i++) {
+                Element e = (Element) nodes.item(i);
+                String url = e.getAttribute("url").trim();
+                if (url.isEmpty()) {
+                    continue;
+                }
+                String type = (e.getAttribute("type") + e.getAttribute("medium")).toLowerCase();
+                boolean isImage = type.contains("image") || (type.isEmpty() && IMG_EXT.matcher(url).find());
+                if (isImage && url.startsWith("http")) {
+                    return url;
+                }
+            }
+        }
+        for (String html : new String[] {rawDescription, text(item, "content:encoded")}) {
+            Matcher m = IMG_TAG.matcher(html == null ? "" : html);
+            if (m.find()) {
+                String url = m.group(1).replace("&amp;", "&").trim();
+                if (url.startsWith("//")) {
+                    url = "https:" + url;
+                }
+                if (url.startsWith("http")) {
+                    return url;
+                }
+            }
+        }
+        return "";
     }
 
     private static String text(Element parent, String tag) {
