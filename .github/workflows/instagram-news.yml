@@ -1,13 +1,10 @@
-
 name: Instagram News Automation
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: '52 5 * * *'
-      timezone: "Asia/Kolkata"  # 5:52 AM IST
-    - cron: '52 17 * * *'
-      timezone: "Asia/Kolkata"  # 5:52 PM IST
+    - cron: '22 0 * * *'    # about 5:52 AM IST
+    - cron: '22 12 * * *'   # about 5:52 PM IST
 
 permissions:
   contents: read
