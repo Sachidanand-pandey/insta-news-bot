@@ -3,8 +3,8 @@ name: Instagram News Automation
 on:
   workflow_dispatch:
   schedule:
-    - cron: '22 0 * * *'    # about 5:52 AM IST
-    - cron: '22 12 * * *'   # about 5:52 PM IST
+    - cron: '37 20 * * *'   # 2:07 AM IST
+    - cron: '37 8 * * *'    # 2:07 PM IST
 
 permissions:
   contents: read
