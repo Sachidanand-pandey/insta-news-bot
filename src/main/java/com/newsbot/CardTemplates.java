@@ -27,7 +27,15 @@ final class CardTemplates {
               background:#ffb703;padding:10px 26px;border-radius:40px;align-self:flex-start}
             .photo{position:relative;margin-top:30px;border-radius:24px;overflow:hidden;
               flex:none;background:#0b1220}
-            .photo img{width:100%;height:100%;object-fit:cover;display:block}
+            .photo img{width:100%;height:100%;object-fit:cover;display:block;filter:saturate(1.08) contrast(1.05)}
+            .photo:before{content:'';position:absolute;inset:0;z-index:1;
+              background:linear-gradient(135deg,rgba(20,50,110,.30),rgba(255,140,40,.10))}
+            .photo.tile{display:flex;align-items:center;justify-content:center;
+              background:linear-gradient(135deg,#14233f,#2a4a7f)}
+            .photo.tile:before{display:none}
+            .photo.tile img.lg{width:260px;height:260px;border-radius:50%;object-fit:cover;filter:none;
+              box-shadow:0 10px 36px rgba(0,0,0,.45)}
+            .logo{border-radius:50%;object-fit:cover;display:block;box-shadow:0 10px 36px rgba(0,0,0,.45)}
             .photo:after{content:'';position:absolute;left:0;right:0;bottom:0;height:45%;
               background:linear-gradient(rgba(0,0,0,0),rgba(0,0,0,.62))}
             .photo .badge{position:absolute;left:22px;top:22px;margin:0;font-size:30px;padding:8px 22px;z-index:2}
@@ -61,14 +69,16 @@ final class CardTemplates {
     }
 
     /** photo may be null; when present it is used (darkened) as the cover background. */
-    static String cover(String brand, String handle, String editionLabel, String dateLabel, int storyCount, String photo) {
+    static String cover(String brand, String handle, String editionLabel, String dateLabel, int storyCount, String photo, String logo) {
+        String logoImg = logo == null ? "" : "<img class=\"logo\" src=\"" + logo + "\" style=\"width:230px;height:230px;margin-top:90px\">";
         String bg = photo == null ? "" :
                 "<div style=\"position:absolute;inset:0;z-index:-1;background:linear-gradient(160deg,"
                         + "rgba(11,18,32,.90) 0%,rgba(20,35,63,.78) 55%,rgba(29,53,87,.88) 100%),url('" + photo
                         + "') center/cover no-repeat\"></div>";
         return page(bg + """
                 <div class="top"><div class="brand">{{BRAND}}</div><div class="handle">{{HANDLE}}</div></div>
-                <div style="margin-top:250px;font-size:34px;letter-spacing:8px;color:#ffb703;font-weight:700">{{DATE}}</div>
+                {{LOGO}}
+                <div style="margin-top:{{DATEGAP}}px;font-size:34px;letter-spacing:8px;color:#ffb703;font-weight:700">{{DATE}}</div>
                 <h1 style="font-size:132px;margin-top:30px">{{EDITION}}</h1>
                 <div class="bar"></div>
                 <p style="font-size:44px;max-width:760px">The {{COUNT}} stories you need to know right now.</p>
@@ -76,21 +86,27 @@ final class CardTemplates {
                 """
                 .replace("{{BRAND}}", esc(brand))
                 .replace("{{HANDLE}}", at(handle))
+                .replace("{{LOGO}}", logoImg)
+                .replace("{{DATEGAP}}", logo == null ? "250" : "50")
                 .replace("{{DATE}}", esc(dateLabel.toUpperCase()))
                 .replace("{{EDITION}}", esc(editionLabel))
                 .replace("{{COUNT}}", String.valueOf(storyCount)), handle);
     }
 
     /** photo may be null (no photo found): the slide then falls back to the text-only layout. */
-    static String news(String brand, String handle, int index, int total, NewsItem item, String photo) {
+    static String news(String brand, String handle, int index, int total, NewsItem item, String photo, String logo) {
         boolean hasPhoto = photo != null;
+        boolean hasImage = hasPhoto || logo != null;   // no photo -> a branded tile with your logo instead
         int len = item.title().length();
-        int headlineSize = hasPhoto
+        int headlineSize = hasImage
                 ? (len < 70 ? 56 : len < 110 ? 52 : len < 150 ? 47 : len < 200 ? 41 : 36)
                 : (len < 70 ? 70 : len < 110 ? 60 : len < 150 ? 52 : 44);
-        int summarySize = hasPhoto ? (len < 110 ? 34 : 31) : 36;
+        int summarySize = hasImage ? (len < 110 ? 34 : 31) : 36;
         int photoHeight = len < 70 ? 580 : len < 110 ? 540 : len < 150 ? 500 : len < 200 ? 430 : 340;
-        int summaryLines = hasPhoto ? 3 : 8;
+        if (!hasPhoto && logo != null) {
+            photoHeight = Math.min(photoHeight, 420);
+        }
+        int summaryLines = hasImage ? 3 : 8;
         String summary = item.summary().isBlank() ? "" :
                 "<p class=\"clamp\" style=\"font-size:" + summarySize + "px;-webkit-line-clamp:" + summaryLines + "\">"
                         + esc(item.summary()) + "</p>";
@@ -99,6 +115,9 @@ final class CardTemplates {
         String photoBlock = hasPhoto
                 ? "<div class=\"photo\" style=\"height:" + photoHeight + "px\"><img src=\"" + photo + "\"><div class=\"badge\">" + idx + "</div>"
                         + "<div class=\"credit\">Photo: " + esc(item.source()) + "</div></div>"
+                : logo != null
+                ? "<div class=\"photo tile\" style=\"height:" + photoHeight + "px\"><img class=\"lg\" src=\"" + logo + "\">"
+                        + "<div class=\"badge\">" + idx + "</div></div>"
                 : "<div class=\"badge\">" + idx + "</div>";
         String readMore = item.link().isBlank() ? "" : "<div class=\"more\">Read the full story: link in caption</div>";
 
@@ -115,7 +134,7 @@ final class CardTemplates {
                 .replace("{{BRAND}}", esc(brand))
                 .replace("{{HANDLE}}", at(handle))
                 .replace("{{SIZE}}", String.valueOf(headlineSize))
-                .replace("{{GAP}}", hasPhoto ? "30" : "48")
+                .replace("{{GAP}}", hasImage ? "30" : "48")
                 .replace("{{TITLE}}", esc(item.title()))
                 .replace("{{SUMMARY}}", summary)
                 .replace("{{MORE}}", readMore)
@@ -123,15 +142,19 @@ final class CardTemplates {
                 .replace("{{PHOTO}}", photoBlock), handle);
     }
 
-    static String outro(String brand, String handle) {
+    static String outro(String brand, String handle, String logo) {
+        String logoImg = logo == null ? "" : "<img class=\"logo\" src=\"" + logo + "\" style=\"width:240px;height:240px;margin-top:110px\">";
         return page("""
                 <div class="top"><div class="brand">{{BRAND}}</div><div class="handle">{{HANDLE}}</div></div>
-                <h1 style="font-size:96px;margin-top:300px">Stay informed, every day.</h1>
+                {{LOGO}}
+                <h1 style="font-size:96px;margin-top:{{H1GAP}}px">Stay informed, every day.</h1>
                 <div class="bar"></div>
                 <p style="font-size:42px;max-width:800px">Fresh news every morning and evening. Follow, like and share so you never miss an update.</p>
                 <div class="footer"><span style="font-size:36px;color:#ffb703;font-weight:700">Follow {{HANDLE}}</span><span></span></div>
                 """
                 .replace("{{BRAND}}", esc(brand))
+                .replace("{{LOGO}}", logoImg)
+                .replace("{{H1GAP}}", logo == null ? "300" : "60")
                 .replace("{{HANDLE}}", at(handle)), handle);
     }
 

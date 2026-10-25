@@ -35,7 +35,7 @@ final class NewsFetcher {
 
     static final String DEFAULT_FEEDS = String.join(",",
             "The Hindu|https://www.thehindu.com/news/national/feeder/default.rss",
-            "NDTV|https://feeds.feedburner.com/ndtvnews-top-stories",
+            "Indian Express|https://indianexpress.com/section/india/feed/",
             "Times of India|https://timesofindia.indiatimes.com/rssfeedstopstories.cms");
 
     /** Parses "Name|url,Name|url" (the NEWS_FEEDS format). */
